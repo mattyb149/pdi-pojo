@@ -5,6 +5,7 @@ import java.lang.reflect.Field;
 import java.util.HashMap;
 
 import org.apache.commons.lang.StringUtils;
+import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Control;
 import org.pentaho.di.core.Const;
 import org.pentaho.di.core.row.ValueMeta;
@@ -23,17 +24,31 @@ public class StepPluginUtils {
     {
       put( "boolean", "Checkbox" );
       put( "Boolean", "Checkbox" );
+      put( "Date", "Date" );
     }
   };
 
-  // TODO add button styles
   @SuppressWarnings( "serial" )
   private static final HashMap<String, String> SWT_WIDGET_MAP = new HashMap<String, String>() {
     {
       put( "Checkbox", "Button" );
       put( "Radio", "Button" );
       put( "Button", "Button" );
+      put( "Date", "DateTime" );
+      put( "Time", "DateTime" );
       put( "TextVar", "TextVar" );
+    }
+  };
+
+  @SuppressWarnings( "serial" )
+  private static final HashMap<String, Integer> SWT_STYLE_MAP = new HashMap<String, Integer>() {
+    {
+      put( "Checkbox", SWT.CHECK );
+      put( "Radio", SWT.RADIO );
+      put( "Button", SWT.PUSH | SWT.CENTER );
+      put( "Date", SWT.CALENDAR );
+      put( "Time", SWT.TIME );
+      put( "TextVar", SWT.SINGLE | SWT.LEFT | SWT.BORDER );
     }
   };
 
@@ -75,11 +90,26 @@ public class StepPluginUtils {
       Annotation uiAnno = field.getAnnotation( org.pentaho.di.pojo.annotation.UI.class );
       if ( uiAnno != null ) {
 
+        // Set label
         String label = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).label();
         if ( Const.isEmpty( label ) ) {
           label = getLabelFromName( field.getName() );
         }
         ui.setLabel( label );
+
+        // Set text
+        String text = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).text();
+        if ( Const.isEmpty( text ) ) {
+          text = label;
+        }
+        ui.setText( text );
+
+        // Set tooltip text (aka description)
+        String description = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).description();
+        if ( Const.isEmpty( description ) ) {
+          description = label;
+        }
+        ui.setDescription( description );
 
         String type = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).hint();
         if ( Const.isEmpty( type ) ) {
@@ -103,6 +133,7 @@ public class StepPluginUtils {
             controlClass = (Class<? extends Control>) Class.forName( controlClassName );
             ui.setControl( controlClass );
             System.out.println( "Found widget: " + controlClass.getName() );
+            ui.setUIStyle( SWT_STYLE_MAP.get( type ) );
             break;
           } catch ( Exception e ) {
             // Couldn't find the control, try again with a new prefix
@@ -116,10 +147,21 @@ public class StepPluginUtils {
         // Set defaults
         ui.setLabel( getLabelFromName( field.getName() ) );
         ui.setControl( TextVar.class );
+        ui.setUIStyle( SWT.SINGLE | SWT.LEFT | SWT.BORDER );
       }
     } catch ( Exception e ) {
       // TODO
       e.printStackTrace( System.err );
+    }
+
+    // Set description to label
+    if ( ui != null ) {
+      if ( Const.isEmpty( ui.getText() ) ) {
+        ui.setText( ui.getLabel() );
+      }
+      if ( Const.isEmpty( ui.getDescription() ) ) {
+        ui.setDescription( ui.getLabel() );
+      }
     }
     return ui;
   }
@@ -133,6 +175,7 @@ public class StepPluginUtils {
   public static void dumpUIMetadata( UIMetadataBean ui ) {
     System.out.println( "Label = " + ui.getLabel() );
     System.out.println( "Control type = " + ui.getControl().getSimpleName() );
+    System.out.println( "Style = " + ui.getUIStyle() );
   }
 
   public static String getLabelFromName( String name ) {

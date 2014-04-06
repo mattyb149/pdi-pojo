@@ -1,5 +1,7 @@
 package org.pentaho.di.pojo.examples;
 
+import java.util.Date;
+
 import org.pentaho.di.core.annotations.Step;
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.pojo.StepPluginPOJO;
@@ -28,6 +30,12 @@ public class TestStepPluginPOJO extends StepPluginPOJO {
   
   @UI(label="Cool bool: ")
   private boolean testBoolWithLabel;
+  
+  @UI(label="Start date", hint="Date")
+  private Date startDate;
+  
+  @UI(label="End TOD", hint="Time")
+  private Date endTime;
   
   @NewField
   private String status;
