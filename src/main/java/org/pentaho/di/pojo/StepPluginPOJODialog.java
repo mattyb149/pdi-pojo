@@ -1,6 +1,5 @@
 package org.pentaho.di.pojo;
 
-import java.awt.Composite;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
 import java.util.HashMap;
@@ -18,6 +17,7 @@ import org.eclipse.swt.layout.FormAttachment;
 import org.eclipse.swt.layout.FormData;
 import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
@@ -124,11 +124,11 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
         try {
           if ( TextVar.class.isAssignableFrom( controlClass ) ) {
             control =
-                controlClass.getConstructor( VariableSpace.class, Composite.class, Integer.TYPE ).newInstance(
+                controlClass.getDeclaredConstructor( VariableSpace.class, Composite.class, Integer.TYPE ).newInstance(
                     transMeta, shell, SWT.SINGLE | SWT.LEFT | SWT.BORDER );
           } else {
             control =
-                controlClass.getConstructor( Composite.class, Integer.TYPE ).newInstance( shell,
+                controlClass.getDeclaredConstructor( Composite.class, Integer.TYPE ).newInstance( shell,
                     SWT.SINGLE | SWT.LEFT | SWT.BORDER );
           }
         } catch ( Exception e ) {
@@ -176,7 +176,6 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
     };
 
     wOK.addListener( SWT.Selection, lsOK );
-    wPreview.addListener( SWT.Selection, lsPreview );
     wCancel.addListener( SWT.Selection, lsCancel );
 
     lsDef = new SelectionAdapter() {

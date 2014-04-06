@@ -16,7 +16,15 @@ public class StepPluginUtils {
 
   private static final String[] SWT_CONTROL_PREFIX = { "org.pentaho.di.ui.core.widget.", "org.eclipse.swt.widgets." };
   
+  // Mapping of Java primitive types/classes to Controls. The default is TextVar, this map is for exceptions
+  @SuppressWarnings( "serial" )
+  private static final HashMap<String,String> JAVA_2_WIDGET_MAP = new HashMap<String,String>() {{
+    put("bool", "Checkbox");
+    put("Boolean", "Checkbox");
+  }};
+  
   // TODO add button styles
+  @SuppressWarnings( "serial" )
   private static final HashMap<String,String> SWT_WIDGET_MAP = new HashMap<String,String>() {{
     put("Checkbox", "Button");
     put("Radio", "Button");
@@ -70,7 +78,13 @@ public class StepPluginUtils {
 
         String type = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).hint();
         if ( Const.isEmpty( type ) ) {
-          type = "TextVar";
+          String typeVal = JAVA_2_WIDGET_MAP.get( field.getClass().getSimpleName() );
+          if(Const.isEmpty(typeVal)) {
+            type = "TextVar";
+          }
+          else {
+            type = typeVal;
+          }
         }
         else {
           type = SWT_WIDGET_MAP.get( type );
