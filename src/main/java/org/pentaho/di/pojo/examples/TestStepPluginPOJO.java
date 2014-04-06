@@ -22,7 +22,7 @@ public class TestStepPluginPOJO extends StepPluginPOJO {
   
   private boolean testBool;
   
-  @UI(hint="TextVar")
+  @UI(hint="Checkbox")
   private boolean testBoolAsText;
   
   @UI(label="Cool bool: ")

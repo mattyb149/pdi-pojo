@@ -1,20 +1,20 @@
 package org.pentaho.di.pojo;
 
-import org.eclipse.swt.widgets.Widget;
+import org.eclipse.swt.widgets.Control;
 
 public class UIMetadataBean {
 
   private String label = null;
 
-  private Class<? extends Widget> widget = null;
+  private Class<? extends Control> control = null;
 
   public UIMetadataBean() {
 
   }
 
-  public UIMetadataBean( String label, Class<? extends Widget> widget ) {
+  public UIMetadataBean( String label, Class<? extends Control> control ) {
     this.label = label;
-    this.widget = widget;
+    this.control = control;
   }
 
   public String getLabel() {
@@ -25,12 +25,12 @@ public class UIMetadataBean {
     this.label = label;
   }
 
-  public Class<? extends Widget> getWidget() {
-    return widget;
+  public Class<? extends Control> getControl() {
+    return control;
   }
 
-  public void setWidget( Class<? extends Widget> widget ) {
-    this.widget = widget;
+  public void setControl( Class<? extends Control> control ) {
+    this.control = control;
   }
 
 }

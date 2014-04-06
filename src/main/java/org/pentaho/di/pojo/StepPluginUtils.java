@@ -2,8 +2,9 @@ package org.pentaho.di.pojo;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.util.HashMap;
 
-import org.eclipse.swt.widgets.Widget;
+import org.eclipse.swt.widgets.Control;
 import org.pentaho.di.core.Const;
 import org.pentaho.di.core.row.ValueMeta;
 import org.pentaho.di.core.row.ValueMetaInterface;
@@ -13,19 +14,24 @@ import org.pentaho.di.ui.core.widget.TextVar;
 
 public class StepPluginUtils {
 
-  private static final String[] SWT_WIDGET_PREFIX = { "org.pentaho.di.ui.core.widget.", "org.eclipse.swt.widgets." };
+  private static final String[] SWT_CONTROL_PREFIX = { "org.pentaho.di.ui.core.widget.", "org.eclipse.swt.widgets." };
+  
+  // TODO add button styles
+  private static final HashMap<String,String> SWT_WIDGET_MAP = new HashMap<String,String>() {{
+    put("Checkbox", "Button");
+    put("Radio", "Button");
+    put("Button", "Button");
+    put("TextVar", "TextVar");
+  }};
 
   public static FieldMetadataBean generateFieldMetadata( Field field ) {
     FieldMetadataBean fieldMetadata = null;
     try {
-      fieldMetadata = new FieldMetadataBean();
-      fieldMetadata.setName( field.getName() );
-      fieldMetadata.setValueMeta( getValueMetaForField( field ) );
-      fieldMetadata.setUIMetadata( getUIForField( field ) );
-      dumpFieldMetadata(fieldMetadata);
+      fieldMetadata = new FieldMetadataBean( field, getValueMetaForField( field ), getUIForField( field ) );
+      dumpFieldMetadata( fieldMetadata );
     } catch ( Exception e ) {
-      //TODO
-      e.printStackTrace(System.err);
+      // TODO
+      e.printStackTrace( System.err );
     }
     return fieldMetadata;
   }
@@ -42,8 +48,8 @@ public class StepPluginUtils {
         valueMeta = ValueMetaFactory.createValueMeta( type, ValueMeta.getType( type ) );
       }
     } catch ( Exception e ) {
-      //TODO
-      e.printStackTrace(System.err);
+      // TODO
+      e.printStackTrace( System.err );
     }
 
     return valueMeta;
@@ -55,7 +61,7 @@ public class StepPluginUtils {
     try {
       Annotation uiAnno = field.getAnnotation( org.pentaho.di.pojo.annotation.UI.class );
       if ( uiAnno != null ) {
-        
+
         String label = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).label();
         if ( Const.isEmpty( label ) ) {
           label = field.getName();
@@ -66,32 +72,36 @@ public class StepPluginUtils {
         if ( Const.isEmpty( type ) ) {
           type = "TextVar";
         }
-        // Map Type to widget
-        Class<? extends Widget> widgetClass = null;
-        for ( String prefix : SWT_WIDGET_PREFIX ) {
-          String widgetClassName = prefix + type;
+        else {
+          type = SWT_WIDGET_MAP.get( type );
+        }
+        
+        
+        // Map Type to control
+        Class<? extends Control> controlClass = null;
+        for ( String prefix : SWT_CONTROL_PREFIX ) {
+          String controlClassName = prefix + type;
 
           try {
-            widgetClass = (Class<? extends Widget>) Class.forName( widgetClassName );
-            ui.setWidget( widgetClass );
+            controlClass = (Class<? extends Control>) Class.forName( controlClassName );
+            ui.setControl( controlClass );
             break;
           } catch ( Exception e ) {
-            // Couldn't find the widget, try again with a new prefix
+            // Couldn't find the control, try again with a new prefix
           }
         }
-        if ( widgetClass == null ) {
+        if ( controlClass == null ) {
           // TODO
-          System.err.println("Couldn't find any Widget matching "+type);
+          System.err.println( "Couldn't find any Control matching " + type );
         }
-      }
-      else {
+      } else {
         // Set defaults
-        ui.setLabel(field.getName());
-        ui.setWidget( TextVar.class );
+        ui.setLabel( field.getName() );
+        ui.setControl( TextVar.class );
       }
     } catch ( Exception e ) {
-      //TODO
-      e.printStackTrace(System.err);
+      // TODO
+      e.printStackTrace( System.err );
     }
     return ui;
   }
@@ -104,7 +114,7 @@ public class StepPluginUtils {
 
   public static void dumpUIMetadata( UIMetadataBean ui ) {
     System.out.println( "Label = " + ui.getLabel() );
-    System.out.println( "Widget type = " + ui.getWidget().getSimpleName() );
+    System.out.println( "Control type = " + ui.getControl().getSimpleName() );
   }
 
 }

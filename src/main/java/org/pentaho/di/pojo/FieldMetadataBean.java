@@ -1,48 +1,40 @@
 package org.pentaho.di.pojo;
 
+import java.lang.reflect.Field;
+
 import org.pentaho.di.core.row.ValueMetaInterface;
 
 public class FieldMetadataBean {
   
-  private String name = null;
+  private Field field = null;
   
   private ValueMetaInterface valueMeta = null;
   
   private UIMetadataBean uiMetadata = null;
   
   
-  public FieldMetadataBean() {
+  public FieldMetadataBean(Field field, ValueMetaInterface valueMeta, UIMetadataBean uiMetadata) {
     
+    this.field = field;
+    this.valueMeta = valueMeta;
+    this.uiMetadata = uiMetadata;
   }
   
-  public FieldMetadataBean(String name, ValueMetaInterface valueMeta, Object defaultValue, UIMetadataBean uiMetadata) {
-    setName(name);
-    setValueMeta(valueMeta);
-    setUIMetadata(uiMetadata);
-  }
-  
-  public String getName() {
-    return name;
+  public Field getField() {
+    return field;
   }
 
-  public void setName( String name ) {
-    this.name = name;
+  public String getName() {
+    return field.getName();
   }
 
   public ValueMetaInterface getValueMeta() {
     return valueMeta;
   }
 
-  public void setValueMeta( ValueMetaInterface valueMeta ) {
-    this.valueMeta = valueMeta;
-  }
-
   public UIMetadataBean getUIMetadata() {
     return uiMetadata;
   }
 
-  public void setUIMetadata( UIMetadataBean uIMetadata ) {
-    this.uiMetadata = uIMetadata;
-  }
-
+  
 }

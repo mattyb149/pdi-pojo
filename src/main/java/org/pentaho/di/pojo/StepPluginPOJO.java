@@ -1,7 +1,7 @@
 package org.pentaho.di.pojo;
 
 import java.lang.reflect.Field;
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -40,7 +40,7 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
 
   protected MoreAccessibleBaseStep baseStep = null;
   protected StepDataInterface stepDataInterface = null;
-  protected Map<Field, FieldMetadataBean> metaFields = null;
+  protected List<FieldMetadataBean> metaFields = null;
 
   public StepPluginPOJO() {
     generateMetaFields();
@@ -64,11 +64,11 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
     };
   }
 
-  protected Map<Field, FieldMetadataBean> getMetaFields() {
+  public List<FieldMetadataBean> getMetaFields() {
     return metaFields;
   }
 
-  protected void setMetaFields( Map<Field, FieldMetadataBean> metaFields ) {
+  public void setMetaFields( List<FieldMetadataBean> metaFields ) {
     this.metaFields = metaFields;
   }
 
@@ -77,13 +77,13 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
     // Look for @ExcludeMeta, include all others
     Field[] fields = this.getClass().getDeclaredFields();
     if ( fields != null ) {
-      metaFields = new HashMap<Field, FieldMetadataBean>( fields.length );
+      metaFields = new ArrayList<FieldMetadataBean>( fields.length );
 
       for ( Field field : fields ) {
         if ( field.getAnnotation( ExcludeMeta.class ) == null ) {
           FieldMetadataBean fieldMetadata = StepPluginUtils.generateFieldMetadata( field );
           if ( fieldMetadata != null ) {
-            metaFields.put( field, fieldMetadata );
+            metaFields.add( fieldMetadata );
             System.out.println( "Added meta field: " + field.getName() );
           }
         } else {
@@ -447,9 +447,8 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
     return retval;
   }
 
-  // TODO
   public String getDialogClassName() {
-    return super.getDialogClassName();
+    return StepPluginPOJODialog.class.getName();
   }
 
   public void getFields( RowMetaInterface inputRowMeta, String name, RowMetaInterface[] info, StepMeta nextStep,
