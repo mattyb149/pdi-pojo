@@ -4,6 +4,7 @@ import org.pentaho.di.core.annotations.Step;
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.pojo.StepPluginPOJO;
 import org.pentaho.di.pojo.annotation.ExcludeMeta;
+import org.pentaho.di.pojo.annotation.NewField;
 import org.pentaho.di.pojo.annotation.UI;
 import org.pentaho.di.trans.step.StepDataInterface;
 import org.pentaho.di.trans.step.StepMetaInterface;
@@ -23,6 +24,12 @@ public class TestStepPluginPOJO extends StepPluginPOJO {
   
   @UI(hint="TextVar")
   private boolean testBoolAsText;
+  
+  @UI(label="Cool bool: ")
+  private boolean testBoolWithLabel;
+  
+  @NewField
+  private String status;
 
   @Override
   public boolean processRow( StepMetaInterface smi, StepDataInterface sdi ) throws KettleException {
