@@ -18,6 +18,30 @@ public class StepPluginUtils {
 
   private static final String[] SWT_CONTROL_PREFIX = { "org.pentaho.di.ui.core.widget.", "org.eclipse.swt.widgets." };
 
+  // Mapping of Java primitive types to ValueMeta primitive (built-in) types. 
+  // The default is ValueMetaString, this map is for exceptions.
+  @SuppressWarnings( "serial" )
+  private static final HashMap<String, String> JAVA_2_VALUEMETA_MAP = new HashMap<String, String>() {
+    {
+      put( "boolean", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_BOOLEAN ) );
+      put( "Boolean", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_BOOLEAN ) );
+      put( "Date", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_DATE ) );
+      put( "Time", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_TIMESTAMP ) );
+      put( "InetAddress", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INET ) );
+      put( "short", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
+      put( "Short", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
+      put( "int", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
+      put( "Integer", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ));
+      put( "long", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ));
+      put( "BigInteger", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_BIGNUMBER ) );
+      put( "float", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_BIGNUMBER ) );
+      put( "Float", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_NUMBER ) );
+      put( "double", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_NUMBER ) );
+      put( "Double", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_NUMBER ) );
+      // TODO more?
+    }
+  };
+
   // Mapping of Java primitive types/classes to Controls. The default is TextVar, this map is for exceptions
   @SuppressWarnings( "serial" )
   private static final HashMap<String, String> JAVA_2_WIDGET_MAP = new HashMap<String, String>() {
@@ -72,6 +96,14 @@ public class StepPluginUtils {
         String type = ( (org.pentaho.di.pojo.annotation.ValueMeta) valueMetaAnno ).type();
         if ( Const.isEmpty( type ) ) {
           type = "String";
+        }
+        valueMeta = ValueMetaFactory.createValueMeta( type, ValueMeta.getType( type ) );
+      } else {
+        // Determine ValueMeta type based on Java type
+        String type = JAVA_2_VALUEMETA_MAP.get( field.getType().getSimpleName() );
+        if(Const.isEmpty(type)) {
+          // Default to ValueMetaString
+          type = ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_STRING );
         }
         valueMeta = ValueMetaFactory.createValueMeta( type, ValueMeta.getType( type ) );
       }

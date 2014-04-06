@@ -1,6 +1,8 @@
-apply plugin: "java"
-apply plugin: "eclipse"
-apply plugin: "idea"
+apply plugin: 'java'
+apply plugin: 'eclipse'
+apply plugin: 'idea'
+apply plugin: 'maven'
+apply plugin: 'signing'
 
 project.ext.kettle_version = '5.0+'
 description = "Helpers to create PDI elements using POJOs"

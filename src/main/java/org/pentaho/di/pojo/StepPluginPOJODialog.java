@@ -1,16 +1,19 @@
 package org.pentaho.di.pojo;
 
 import java.lang.annotation.Annotation;
+import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.events.SelectionListener;
 import org.eclipse.swt.events.ShellAdapter;
 import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.layout.FormAttachment;
@@ -25,10 +28,10 @@ import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Text;
-import org.eclipse.swt.widgets.Widget;
 import org.pentaho.di.core.Const;
 import org.pentaho.di.core.annotations.Step;
 import org.pentaho.di.core.exception.KettleException;
+import org.pentaho.di.core.row.ValueMetaInterface;
 import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.BaseStepMeta;
@@ -41,12 +44,12 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
 
   protected StepPluginPOJO input;
 
-  protected Map<Widget, FieldMetadataBean> widgetMap = null;
+  protected Map<FieldMetadataBean, Control> controlMap = null;
 
   public StepPluginPOJODialog( Shell parent, Object baseStepMeta, TransMeta transMeta, String stepname ) {
     super( parent, (BaseStepMeta) baseStepMeta, transMeta, stepname );
     input = (StepPluginPOJO) baseStepMeta;
-    widgetMap = new HashMap<Widget, FieldMetadataBean>( input.getMetaFields().size() );
+    controlMap = new HashMap<FieldMetadataBean, Control>( input.getMetaFields().size() );
   }
 
   @Override
@@ -103,6 +106,15 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
     wStepname.setLayoutData( fdStepname );
     Control lastControl = wStepname;
 
+    // Create common SelectionAdapter and set it for step name control
+    lsDef = new SelectionAdapter() {
+      public void widgetDefaultSelected( SelectionEvent e ) {
+        ok();
+      }
+    };
+
+    wStepname.addSelectionListener( lsDef );
+
     // Create UI elements from field metadata
     List<FieldMetadataBean> fields = input.getMetaFields();
     if ( fields != null ) {
@@ -117,7 +129,6 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
         fdlLabel.top = new FormAttachment( lastControl, margin );
         label.setLayoutData( fdlLabel );
 
-        // TODO Need logic here for custom controls
         Class<? extends Control> controlClass = ui.getControl();
         Control control = null;
 
@@ -131,23 +142,23 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
                 controlClass.getDeclaredConstructor( Composite.class, Integer.TYPE ).newInstance( shell,
                     ui.getUIStyle() );
           }
+          controlMap.put( field, control );
+
         } catch ( Exception e ) {
           new ErrorDialog( shell, "Error displaying dialog",
               "There was an error while attempting to display the dialog", e );
         }
 
         props.setLook( control );
-        
+
         // Set text if possible, and set tooltip text
         try {
           Method setText = controlClass.getMethod( "setText", String.class );
-          setText.invoke(control, ui.getText());
-        }
-        catch(Exception e) {
+          setText.invoke( control, ui.getText() );
+        } catch ( Exception e ) {
           // This control has no setText method, keep calm and carry on
         }
         control.setToolTipText( ui.getDescription() );
-        
 
         // TODO add appropriate listeners
         try {
@@ -156,6 +167,13 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
         } catch ( Exception e ) {
           // No-op, the control doesn't listen to modify events
         }
+        try {
+          Method addSelectionListener = controlClass.getMethod( "addSelectionListener", SelectionListener.class );
+          addSelectionListener.invoke( control, lsDef );
+        } catch ( Exception e ) {
+          // No-op, the control doesn't listen to selection events
+        }
+
         FormData fdLimit = new FormData();
         fdLimit.left = new FormAttachment( middle, 0 );
         fdLimit.top = new FormAttachment( lastControl, margin );
@@ -188,15 +206,6 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
 
     wOK.addListener( SWT.Selection, lsOK );
     wCancel.addListener( SWT.Selection, lsCancel );
-
-    lsDef = new SelectionAdapter() {
-      public void widgetDefaultSelected( SelectionEvent e ) {
-        ok();
-      }
-    };
-
-    wStepname.addSelectionListener( lsDef );
-    // TODO add the others
 
     // Detect X or ALT-F4 or something that kills this window...
     shell.addShellListener( new ShellAdapter() {
@@ -257,6 +266,41 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
   public void getData() {
     if ( isDebug() ) {
       logDebug( "getting fields info..." );
+    }
+
+    // Call the bean methods to get the info
+    List<FieldMetadataBean> fields = input.getMetaFields();
+    if ( fields != null ) {
+      for ( FieldMetadataBean fieldBean : fields ) {
+        try {
+          Field field = fieldBean.getField();
+          ValueMetaInterface valueMeta = fieldBean.getValueMeta();
+          String getterMethodName = "get" + StringUtils.capitalize( field.getName() );
+          Method getterMethod = input.getClass().getDeclaredMethod( getterMethodName );
+          Object obj = getterMethod.invoke( input );
+          // TODO casting, widget setting, etc.
+          Control control = controlMap.get( field );
+          obj = valueMeta.convertData( valueMeta, obj );
+
+          // Set text if possible, and set tooltip text
+          try {
+            Method setText = control.getClass().getMethod( "setText", String.class );
+            setText.invoke( control, Const.NVL( valueMeta.getString( obj ), "" ) );
+          } catch ( Exception e ) {
+            // This control has no setText method, keep calm and carry on
+          }
+
+          // Set selection if possible
+          try {
+            Method setSelection = control.getClass().getMethod( "setSelection", boolean.class );
+            setSelection.invoke( control, valueMeta.getBoolean( obj ) );
+          } catch ( Exception e ) {
+            // This control has no setText method, keep calm and carry on
+          }
+        } catch ( Exception e ) {
+          // TODO throw, skip?
+        }
+      }
     }
 
     /*
