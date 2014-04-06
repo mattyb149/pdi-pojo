@@ -13,6 +13,7 @@ import org.pentaho.di.trans.step.StepMetaInterface;
     description = "Tests the StepPluginPOJO", categoryDescription = "Experimental" )
 public class TestStepPluginPOJO extends StepPluginPOJO {
   
+  @UI(label="Enter value")
   private String testString;
   
   @ExcludeMeta

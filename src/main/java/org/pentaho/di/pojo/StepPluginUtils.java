@@ -4,6 +4,7 @@ import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.util.HashMap;
 
+import org.apache.commons.lang.StringUtils;
 import org.eclipse.swt.widgets.Control;
 import org.pentaho.di.core.Const;
 import org.pentaho.di.core.row.ValueMeta;
@@ -15,22 +16,26 @@ import org.pentaho.di.ui.core.widget.TextVar;
 public class StepPluginUtils {
 
   private static final String[] SWT_CONTROL_PREFIX = { "org.pentaho.di.ui.core.widget.", "org.eclipse.swt.widgets." };
-  
+
   // Mapping of Java primitive types/classes to Controls. The default is TextVar, this map is for exceptions
   @SuppressWarnings( "serial" )
-  private static final HashMap<String,String> JAVA_2_WIDGET_MAP = new HashMap<String,String>() {{
-    put("bool", "Checkbox");
-    put("Boolean", "Checkbox");
-  }};
-  
+  private static final HashMap<String, String> JAVA_2_WIDGET_MAP = new HashMap<String, String>() {
+    {
+      put( "boolean", "Checkbox" );
+      put( "Boolean", "Checkbox" );
+    }
+  };
+
   // TODO add button styles
   @SuppressWarnings( "serial" )
-  private static final HashMap<String,String> SWT_WIDGET_MAP = new HashMap<String,String>() {{
-    put("Checkbox", "Button");
-    put("Radio", "Button");
-    put("Button", "Button");
-    put("TextVar", "TextVar");
-  }};
+  private static final HashMap<String, String> SWT_WIDGET_MAP = new HashMap<String, String>() {
+    {
+      put( "Checkbox", "Button" );
+      put( "Radio", "Button" );
+      put( "Button", "Button" );
+      put( "TextVar", "TextVar" );
+    }
+  };
 
   public static FieldMetadataBean generateFieldMetadata( Field field ) {
     FieldMetadataBean fieldMetadata = null;
@@ -72,25 +77,23 @@ public class StepPluginUtils {
 
         String label = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).label();
         if ( Const.isEmpty( label ) ) {
-          label = field.getName();
+          label = getLabelFromName( field.getName() );
         }
         ui.setLabel( label );
 
         String type = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).hint();
         if ( Const.isEmpty( type ) ) {
-          String typeVal = JAVA_2_WIDGET_MAP.get( field.getClass().getSimpleName() );
-          if(Const.isEmpty(typeVal)) {
+          System.out.println( "Looking for Widget for " + field.getType().getSimpleName() );
+          String typeVal = JAVA_2_WIDGET_MAP.get( field.getType().getSimpleName() );
+          if ( Const.isEmpty( typeVal ) ) {
             type = "TextVar";
+          } else {
+            type = SWT_WIDGET_MAP.get( typeVal );
           }
-          else {
-            type = typeVal;
-          }
-        }
-        else {
+        } else {
           type = SWT_WIDGET_MAP.get( type );
         }
-        
-        
+
         // Map Type to control
         Class<? extends Control> controlClass = null;
         for ( String prefix : SWT_CONTROL_PREFIX ) {
@@ -99,6 +102,7 @@ public class StepPluginUtils {
           try {
             controlClass = (Class<? extends Control>) Class.forName( controlClassName );
             ui.setControl( controlClass );
+            System.out.println( "Found widget: " + controlClass.getName() );
             break;
           } catch ( Exception e ) {
             // Couldn't find the control, try again with a new prefix
@@ -110,7 +114,7 @@ public class StepPluginUtils {
         }
       } else {
         // Set defaults
-        ui.setLabel( field.getName() );
+        ui.setLabel( getLabelFromName( field.getName() ) );
         ui.setControl( TextVar.class );
       }
     } catch ( Exception e ) {
@@ -129,6 +133,13 @@ public class StepPluginUtils {
   public static void dumpUIMetadata( UIMetadataBean ui ) {
     System.out.println( "Label = " + ui.getLabel() );
     System.out.println( "Control type = " + ui.getControl().getSimpleName() );
+  }
+
+  public static String getLabelFromName( String name ) {
+
+    // Divide name by capital letters and capitalize the first letter
+    return StringUtils.capitalize( name.replaceAll( "([A-Z])", " $1" ).toLowerCase() ).trim();
+
   }
 
 }
