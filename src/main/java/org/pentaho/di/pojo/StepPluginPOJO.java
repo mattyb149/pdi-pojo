@@ -462,6 +462,12 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
     return super.getStepMetaInjectionInterface();
   }
 
+  @Override
+  public String getXML() throws KettleException {
+    // TODO 
+    return super.getXML();
+  }
+  
   public void loadXML( Node stepnode, List<DatabaseMeta> databases, IMetaStore metaStore ) throws KettleXMLException {
     // TODO
     super.loadXML( stepnode, databases, metaStore );
@@ -713,7 +719,5 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
   @Override
   public void setDefault() {
     // TODO Auto-generated method stub
-
   }
-
 }

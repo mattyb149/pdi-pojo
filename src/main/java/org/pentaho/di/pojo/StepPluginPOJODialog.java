@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.commons.lang.StringUtils;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
@@ -193,14 +192,26 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
 
     // Add listeners
     lsOK = new Listener() {
-      public void handleEvent( Event e ) {
-        ok();
+      public void handleEvent( Event event ) {
+        // Check for overridden ok method
+        try {
+          Method okMethod = input.getClass().getMethod( "ok" );
+          okMethod.invoke( input );
+        } catch ( Exception e ) {
+          ok();
+        }
       }
     };
 
     lsCancel = new Listener() {
-      public void handleEvent( Event e ) {
-        cancel();
+      public void handleEvent( Event event ) {
+        // Check for overridden cancel method
+        try {
+          Method cancelMethod = input.getClass().getMethod( "cancel" );
+          cancelMethod.invoke( input );
+        } catch ( Exception e ) {
+          cancel();
+        }
       }
     };
 
@@ -227,6 +238,7 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
     // Set the shell size, based upon previous time...
     setSize();
 
+    System.out.println( "Calling getData()" );
     getData();
     input.setChanged( changed );
 
@@ -256,7 +268,8 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
       getInfo( input ); // to put the content on the input structure for real if all is well.
       dispose();
     } catch ( KettleException e ) {
-      new ErrorDialog( shell, "Error displaying dialog", "There was an error while attempting to display the dialog", e );
+      new ErrorDialog( shell, "Error displaying dialog",
+          "There was an error while attempting to dispose of the dialog", e );
     }
   }
 
@@ -275,12 +288,31 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
         try {
           Field field = fieldBean.getField();
           ValueMetaInterface valueMeta = fieldBean.getValueMeta();
-          String getterMethodName = "get" + StringUtils.capitalize( field.getName() );
-          Method getterMethod = input.getClass().getDeclaredMethod( getterMethodName );
-          Object obj = getterMethod.invoke( input );
-          // TODO casting, widget setting, etc.
+          Object obj = field.get( input );
+
+          // Set default value if obj is null
+          // TODO use ui.getText() for text widgets
+          if ( obj == null ) {
+            obj = field.getType().newInstance();
+          }
+
+          /*
+           * TODO? Use bean methods if available String getterMethodName = "get" + StringUtils.capitalize(
+           * field.getName() ); Method getterMethod = input.getClass().getDeclaredMethod( getterMethodName ); Object obj
+           * = getterMethod.invoke( input );
+           */
+
           Control control = controlMap.get( field );
+          // TODO? Replace these hacks to promote shorts and ints with something more robust?
+          if ( Short.class.isAssignableFrom( obj.getClass() ) ) {
+            obj = new Long( ( (Short) obj ).longValue() );
+          }
+          else if ( Integer.class.isAssignableFrom( obj.getClass() ) ) {
+            obj = new Long( ( (Integer) obj ).longValue() );
+          }
           obj = valueMeta.convertData( valueMeta, obj );
+
+          System.out.println( "Setting " + field.getName() + " to " + ( obj == null ? "null!" : obj.toString() ) );
 
           // Set text if possible, and set tooltip text
           try {
@@ -299,8 +331,11 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
           }
         } catch ( Exception e ) {
           // TODO throw, skip?
+          e.printStackTrace( System.err );
         }
       }
+    } else {
+      System.out.println( "No fields!!" );
     }
 
     /*
@@ -334,6 +369,42 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
   }
 
   private void getInfo( StepPluginPOJO meta ) throws KettleException {
+
+    // Call the bean methods to get the info
+    List<FieldMetadataBean> fields = input.getMetaFields();
+    if ( fields != null ) {
+      for ( FieldMetadataBean fieldBean : fields ) {
+        try {
+          Field field = fieldBean.getField();
+          ValueMetaInterface valueMeta = fieldBean.getValueMeta();
+          Object obj = null;
+          /* TODO? Use bean methods if available */
+
+          Control control = controlMap.get( field );
+
+          // Set text if possible, and set tooltip text
+          try {
+            Method setText = control.getClass().getMethod( "getText" );
+            obj = setText.invoke( control, Const.NVL( valueMeta.getString( obj ), "" ) );
+          } catch ( Exception e ) {
+            // This control has no setText method, keep calm and carry on
+          }
+
+          // Set selection if possible
+          try {
+            Method setSelection = control.getClass().getMethod( "getSelection" );
+            obj = setSelection.invoke( control, valueMeta.getBoolean( obj ) );
+          } catch ( Exception e ) {
+            // This control has no setText method, keep calm and carry on
+          }
+
+          obj = valueMeta.convertData( valueMeta, obj );
+        } catch ( Exception e ) {
+          // TODO throw, skip?
+        }
+      }
+    }
+
     /*
      * meta.setRowLimit( wLimit.getText() ); meta.setNeverEnding( wNeverEnding.getSelection() ); meta.setIntervalInMs(
      * wInterval.getText() ); meta.setRowTimeField( wRowTimeField.getText() ); meta.setLastTimeField(

@@ -16,29 +16,29 @@ import org.pentaho.di.trans.step.StepMetaInterface;
 public class TestStepPluginPOJO extends StepPluginPOJO {
   
   @UI(label="Enter value")
-  private String testString;
+  public String testString;
   
   @ExcludeMeta
-  private String testExcludeString;
+  public String testExcludeString;
   
-  private int testInt;
+  public int testInt;
   
-  private boolean testBool;
+  public boolean testBool;
   
   @UI(hint="Checkbox")
-  private boolean testBoolAsText;
+  public boolean testBoolAsText;
   
   @UI(label="Cool bool: ")
-  private boolean testBoolWithLabel;
+  public boolean testBoolWithLabel;
   
   @UI(label="Start date", hint="Date")
-  private Date startDate;
+  public Date startDate;
   
   @UI(label="End TOD", hint="Time")
-  private Date endTime;
+  public Date endTime;
   
   @NewField
-  private String status;
+  public String status;
 
   @Override
   public boolean processRow( StepMetaInterface smi, StepDataInterface sdi ) throws KettleException {
