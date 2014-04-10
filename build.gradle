@@ -4,15 +4,13 @@ apply plugin: 'idea'
 apply plugin: 'maven'
 apply plugin: 'signing'
 
-project.ext.kettle_version = '5.0+'
+project.ext.kettle_version = '5.0.5+'
 description = "Helpers to create PDI elements using POJOs"
 
 // Spock works with Java 1.6 and above
 sourceCompatibility = 1.6
 
 repositories {
-  
-  mavenLocal()
   
   ivy {
     url "http://repo.pentaho.org/artifactory/repo/"
@@ -26,7 +24,9 @@ repositories {
     url 'http://repo.pentaho.org/artifactory/repo'
   }
   
+  mavenLocal()
   mavenCentral()
+   
 }
 
 configurations {
@@ -39,8 +39,10 @@ configurations {
 dependencies {
   compile("pentaho-kettle:kettle-core:${project.ext.kettle_version}")
   compile("pentaho-kettle:kettle-engine:${project.ext.kettle_version}")
-  compile("pentaho-kettle:kettle-dbdialog:${project.ext.kettle_version}")
-  compile("pentaho-kettle:kettle-ui-swt:${project.ext.kettle_version}")
+  compile("pentaho-kettle:kettle-dbdialog:${project.ext.kettle_version}") 
+  compile("pentaho-kettle:kettle-ui-swt:${project.ext.kettle_version}") {
+    exclude module:'jface'
+  }
   compile("pentaho:metastore:${project.ext.kettle_version}")
 }
 

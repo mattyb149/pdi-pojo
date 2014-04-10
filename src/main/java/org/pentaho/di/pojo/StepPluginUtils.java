@@ -2,6 +2,7 @@ package org.pentaho.di.pojo;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 
 import org.apache.commons.lang.StringUtils;
@@ -18,7 +19,7 @@ public class StepPluginUtils {
 
   private static final String[] SWT_CONTROL_PREFIX = { "org.pentaho.di.ui.core.widget.", "org.eclipse.swt.widgets." };
 
-  // Mapping of Java primitive types to ValueMeta primitive (built-in) types. 
+  // Mapping of Java primitive types to ValueMeta primitive (built-in) types.
   // The default is ValueMetaString, this map is for exceptions.
   @SuppressWarnings( "serial" )
   private static final HashMap<String, String> JAVA_2_VALUEMETA_MAP = new HashMap<String, String>() {
@@ -31,8 +32,8 @@ public class StepPluginUtils {
       put( "short", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
       put( "Short", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
       put( "int", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
-      put( "Integer", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ));
-      put( "long", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ));
+      put( "Integer", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
+      put( "long", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_INTEGER ) );
       put( "BigInteger", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_BIGNUMBER ) );
       put( "float", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_BIGNUMBER ) );
       put( "Float", ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_NUMBER ) );
@@ -101,7 +102,7 @@ public class StepPluginUtils {
       } else {
         // Determine ValueMeta type based on Java type
         String type = JAVA_2_VALUEMETA_MAP.get( field.getType().getSimpleName() );
-        if(Const.isEmpty(type)) {
+        if ( Const.isEmpty( type ) ) {
           // Default to ValueMetaString
           type = ValueMetaFactory.getValueMetaName( ValueMetaInterface.TYPE_STRING );
         }
@@ -215,6 +216,31 @@ public class StepPluginUtils {
     // Divide name by capital letters and capitalize the first letter
     return StringUtils.capitalize( name.replaceAll( "([A-Z])", " $1" ).toLowerCase() ).trim();
 
+  }
+
+  public static Object getValueOfFieldFromObject( Object obj, Field field ) throws NoSuchFieldException {
+    // Try the getter method first
+    try {
+      Method getterMethod = obj.getClass().getMethod( "get" + StringUtils.capitalize( field.getName() ) );
+      return getterMethod.invoke( obj );
+    } catch ( Exception e ) {
+
+    }
+
+    // Try to change accessibility just in case
+    try {
+      field.setAccessible( true );
+    } catch ( Exception e ) {
+
+    }
+
+    // Try direct access to the field
+    try {
+      return field.get( obj );
+    }
+    catch(Exception e) {
+      throw new NoSuchFieldException();
+    }
   }
 
 }

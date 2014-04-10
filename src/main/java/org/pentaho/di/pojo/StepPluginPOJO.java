@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.pentaho.di.core.CheckResultInterface;
+import org.pentaho.di.core.Const;
 import org.pentaho.di.core.ResultFile;
 import org.pentaho.di.core.RowSet;
 import org.pentaho.di.core.database.DatabaseMeta;
@@ -16,6 +17,7 @@ import org.pentaho.di.core.exception.KettleXMLException;
 import org.pentaho.di.core.logging.LogChannelInterface;
 import org.pentaho.di.core.row.RowMetaInterface;
 import org.pentaho.di.core.variables.VariableSpace;
+import org.pentaho.di.core.xml.XMLHandler;
 import org.pentaho.di.pojo.annotation.ExcludeMeta;
 import org.pentaho.di.repository.ObjectId;
 import org.pentaho.di.repository.Repository;
@@ -464,10 +466,33 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
 
   @Override
   public String getXML() throws KettleException {
-    // TODO 
-    return super.getXML();
+    StringBuffer retval = new StringBuffer( 300 );
+
+    retval.append( "    <fields>" ).append( Const.CR );
+    List<FieldMetadataBean> fieldBeans = getMetaFields();
+    if(fieldBeans != null) {
+      for(FieldMetadataBean fieldBean : fieldBeans ) {
+        try {
+          Field field = fieldBean.getField();
+          Object value = StepPluginUtils.getValueOfFieldFromObject( this, field );
+        
+          retval.append( "      <field>" ).append( Const.CR );
+          retval.append( "        " ).append( XMLHandler.addTagValue( "name", fieldBean.getName() ) );
+          retval.append( "        " ).append( XMLHandler.addTagValue( "type", fieldBean.getValueMeta().getTypeDesc() ) );
+          
+          retval.append( "        " ).append( XMLHandler.addTagValue( "value", value == null ? "" : value.toString() ) );
+          retval.append( "      </field>" ).append( Const.CR );
+        }
+        catch(Exception e) {
+          this.logError( "Couldn't determine the value of field "+fieldBean.getName(), e );
+        }
+      }
+    }
+    retval.append( "    </fields>" ).append( Const.CR );
+
+    return retval.toString();
   }
-  
+
   public void loadXML( Node stepnode, List<DatabaseMeta> databases, IMetaStore metaStore ) throws KettleXMLException {
     // TODO
     super.loadXML( stepnode, databases, metaStore );
