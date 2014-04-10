@@ -3,6 +3,7 @@ package org.pentaho.di.pojo;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Collection;
 import java.util.HashMap;
 
 import org.apache.commons.lang.StringUtils;
@@ -242,5 +243,43 @@ public class StepPluginUtils {
       throw new NoSuchFieldException();
     }
   }
+  
+  public static void setValueOfFieldToObject( Object obj, Field field, Object value ) throws NoSuchFieldException {
+    // Try the getter method first
+    try {
+      Method setterMethod = obj.getClass().getMethod( "set" + StringUtils.capitalize( field.getName() ) );
+      setterMethod.invoke( obj );
+      return;
+    } catch ( Exception e ) {
 
+    }
+
+    // Try to change accessibility just in case
+    try {
+      field.setAccessible( true );
+    } catch ( Exception e ) {
+
+    }
+
+    // Try direct access to the field
+    try {
+      field.set( obj, value );
+    }
+    catch(Exception e) {
+      throw new NoSuchFieldException();
+    }
+  }
+  
+  public static HashMap<String, FieldMetadataBean> getFieldMetadataBeansAsMap(Collection<FieldMetadataBean> beans) {
+    HashMap<String, FieldMetadataBean> fieldMap = null;
+    
+    if(beans != null) {
+      fieldMap = new HashMap<String, FieldMetadataBean>(beans.size());
+      for(FieldMetadataBean bean : beans) {
+        fieldMap.put( bean.getName(), bean );
+      }
+    }
+    return fieldMap;
+    
+  }
 }

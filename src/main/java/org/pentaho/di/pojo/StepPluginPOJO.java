@@ -2,6 +2,7 @@ package org.pentaho.di.pojo;
 
 import java.lang.reflect.Field;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -470,21 +471,18 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
 
     retval.append( "    <fields>" ).append( Const.CR );
     List<FieldMetadataBean> fieldBeans = getMetaFields();
-    if(fieldBeans != null) {
-      for(FieldMetadataBean fieldBean : fieldBeans ) {
+    if ( fieldBeans != null ) {
+      for ( FieldMetadataBean fieldBean : fieldBeans ) {
         try {
           Field field = fieldBean.getField();
           Object value = StepPluginUtils.getValueOfFieldFromObject( this, field );
-        
+
           retval.append( "      <field>" ).append( Const.CR );
           retval.append( "        " ).append( XMLHandler.addTagValue( "name", fieldBean.getName() ) );
-          retval.append( "        " ).append( XMLHandler.addTagValue( "type", fieldBean.getValueMeta().getTypeDesc() ) );
-          
           retval.append( "        " ).append( XMLHandler.addTagValue( "value", value == null ? "" : value.toString() ) );
           retval.append( "      </field>" ).append( Const.CR );
-        }
-        catch(Exception e) {
-          this.logError( "Couldn't determine the value of field "+fieldBean.getName(), e );
+        } catch ( Exception e ) {
+          this.logError( "Couldn't determine the value of field " + fieldBean.getName(), e );
         }
       }
     }
@@ -494,8 +492,29 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
   }
 
   public void loadXML( Node stepnode, List<DatabaseMeta> databases, IMetaStore metaStore ) throws KettleXMLException {
-    // TODO
-    super.loadXML( stepnode, databases, metaStore );
+
+    List<FieldMetadataBean> fieldBeans = getMetaFields();
+    Node fields = XMLHandler.getSubNode( stepnode, "fields" );
+    int nrfields = XMLHandler.countNodes( fields, "field" );
+    HashMap<String, FieldMetadataBean> fieldMap = StepPluginUtils.getFieldMetadataBeansAsMap( fieldBeans );
+    if ( fieldMap != null ) {
+      for ( int i = 0; i < nrfields; i++ ) {
+
+        Node fnode = XMLHandler.getSubNodeByNr( fields, "field", i );
+        final String name = XMLHandler.getTagValue( fnode, "name" );
+        FieldMetadataBean fieldBean = fieldMap.get( name );
+        if ( fieldBean != null ) {
+          try {
+            StepPluginUtils
+                .setValueOfFieldToObject( this, fieldBean.getField(), XMLHandler.getTagValue( fnode, "name" ) );
+          } catch ( NoSuchFieldException e ) {
+            throw new KettleXMLException( e );
+          }
+        } else {
+          this.logBasic( "No such field: " + name + ", ignoring..." );
+        }
+      }
+    }
   }
 
   public void readRep( Repository rep, IMetaStore metaStore, ObjectId id_step, List<DatabaseMeta> databases )
