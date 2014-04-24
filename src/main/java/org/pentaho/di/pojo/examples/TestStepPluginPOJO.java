@@ -28,7 +28,7 @@ public class TestStepPluginPOJO extends StepPluginPOJO {
   @UI(hint="Checkbox")
   public boolean testBoolAsText;
   
-  @UI(label="Cool bool: ")
+  @UI(label="Cool bool", value="true")
   public boolean testBoolWithLabel;
   
   @UI(label="Start date", hint="Date")

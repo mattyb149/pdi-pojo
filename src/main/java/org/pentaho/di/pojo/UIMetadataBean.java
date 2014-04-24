@@ -5,12 +5,14 @@ import org.eclipse.swt.widgets.Control;
 public class UIMetadataBean {
 
   private String label = null;
+  
+  private String uiHint = null;
 
   private Class<? extends Control> control = null;
   
   private int uiStyle = 0;
   
-  private String text = null;
+  private String value = null;
   
   private String description = null;
 
@@ -55,12 +57,20 @@ public class UIMetadataBean {
     this.description = description;
   }
 
-  public String getText() {
-    return text;
+  public String getValue() {
+    return value;
   }
 
-  public void setText( String text ) {
-    this.text = text;
+  public void setValue( String value ) {
+    this.value = value;
+  }
+
+  public String getUIHint() {
+    return uiHint;
+  }
+
+  public void setUIHint( String uiHint ) {
+    this.uiHint = uiHint;
   }
 
 }

@@ -17,6 +17,9 @@ import org.pentaho.di.core.exception.KettleValueException;
 import org.pentaho.di.core.exception.KettleXMLException;
 import org.pentaho.di.core.logging.LogChannelInterface;
 import org.pentaho.di.core.row.RowMetaInterface;
+import org.pentaho.di.core.row.ValueMetaInterface;
+import org.pentaho.di.core.row.value.ValueMetaInteger;
+import org.pentaho.di.core.row.value.ValueMetaString;
 import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.core.xml.XMLHandler;
 import org.pentaho.di.pojo.annotation.ExcludeMeta;
@@ -87,7 +90,7 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
           FieldMetadataBean fieldMetadata = StepPluginUtils.generateFieldMetadata( field );
           if ( fieldMetadata != null ) {
             metaFields.add( fieldMetadata );
-            System.out.println( "Added meta field: " + field.getName() );
+            // System.out.println( "Added meta field: " + field.getName() );
           }
         } else {
           System.out.println( "Excluded field: " + field.getName() );
@@ -479,10 +482,14 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
 
           retval.append( "      <field>" ).append( Const.CR );
           retval.append( "        " ).append( XMLHandler.addTagValue( "name", fieldBean.getName() ) );
-          retval.append( "        " ).append( XMLHandler.addTagValue( "value", value == null ? "" : value.toString() ) );
+          retval.append( "        " ).append(
+              XMLHandler
+                  .addTagValue( "value", value == null ? "" : StepPluginUtils.getValueAsString( fieldBean, value ) ) );
           retval.append( "      </field>" ).append( Const.CR );
+          System.out
+              .println( "Saving field " + fieldBean.getName() + " = " + ( value == null ? "" : value.toString() ) );
         } catch ( Exception e ) {
-          this.logError( "Couldn't determine the value of field " + fieldBean.getName(), e );
+          throw new KettleException( "Couldn't determine the value of field " + fieldBean.getName(), e );
         }
       }
     }
@@ -505,13 +512,31 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
         FieldMetadataBean fieldBean = fieldMap.get( name );
         if ( fieldBean != null ) {
           try {
-            StepPluginUtils
-                .setValueOfFieldToObject( this, fieldBean.getField(), XMLHandler.getTagValue( fnode, "name" ) );
-          } catch ( NoSuchFieldException e ) {
-            throw new KettleXMLException( e );
+            Field field = fieldBean.getField();
+            ValueMetaInterface valueMeta = fieldBean.getValueMeta();
+            String valueString = XMLHandler.getTagValue( fnode, "value" );
+            if ( valueString != null ) {
+              Object convertedValue = valueMeta.convertData( new ValueMetaString(), valueString );
+              System.out.println( "Converted value from " + valueString + " to " + convertedValue );
+              // Check for Integer (java.Long) -> java int
+              if ( ValueMetaInteger.class.isAssignableFrom( valueMeta.getClass() ) ) {
+                if ( Integer.TYPE.isAssignableFrom( field.getType() ) ) {
+                  convertedValue = ( (Long) convertedValue ).intValue();
+                } else if ( Short.TYPE.isAssignableFrom( field.getType() ) ) {
+                  convertedValue = ( (Long) convertedValue ).shortValue();
+                }
+              }
+              // TODO Dates/times?
+              
+              StepPluginUtils.setValueOfFieldToObject( this, field, convertedValue );
+            } else {
+              System.out.println( "No value in XML for " + field.getName() + ", using default" );
+            }
+          } catch ( KettleException e ) {
+            throw new KettleXMLException( "No such field: " + name, e );
           }
         } else {
-          this.logBasic( "No such field: " + name + ", ignoring..." );
+          System.out.println( "No such field: " + name + ", ignoring..." );
         }
       }
     }

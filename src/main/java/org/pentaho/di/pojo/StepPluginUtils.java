@@ -3,15 +3,19 @@ package org.pentaho.di.pojo;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.text.SimpleDateFormat;
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashMap;
 
 import org.apache.commons.lang.StringUtils;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.Control;
 import org.pentaho.di.core.Const;
+import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.row.ValueMeta;
 import org.pentaho.di.core.row.ValueMetaInterface;
+import org.pentaho.di.core.row.value.ValueMetaBase;
 import org.pentaho.di.core.row.value.ValueMetaFactory;
 import org.pentaho.di.core.row.value.ValueMetaString;
 import org.pentaho.di.ui.core.widget.TextVar;
@@ -82,7 +86,7 @@ public class StepPluginUtils {
     FieldMetadataBean fieldMetadata = null;
     try {
       fieldMetadata = new FieldMetadataBean( field, getValueMetaForField( field ), getUIForField( field ) );
-      dumpFieldMetadata( fieldMetadata );
+      // dumpFieldMetadata( fieldMetadata );
     } catch ( Exception e ) {
       // TODO
       e.printStackTrace( System.err );
@@ -132,11 +136,11 @@ public class StepPluginUtils {
         ui.setLabel( label );
 
         // Set text
-        String text = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).text();
-        if ( Const.isEmpty( text ) ) {
-          text = label;
-        }
-        ui.setText( text );
+        String text = Const.NVL( ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).value(), "" );
+        /*
+         * if ( Const.isEmpty( text ) ) { text = label; }
+         */
+        ui.setValue( text );
 
         // Set tooltip text (aka description)
         String description = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).description();
@@ -145,29 +149,31 @@ public class StepPluginUtils {
         }
         ui.setDescription( description );
 
-        String type = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).hint();
-        if ( Const.isEmpty( type ) ) {
-          System.out.println( "Looking for Widget for " + field.getType().getSimpleName() );
-          String typeVal = JAVA_2_WIDGET_MAP.get( field.getType().getSimpleName() );
-          if ( Const.isEmpty( typeVal ) ) {
-            type = "TextVar";
-          } else {
-            type = SWT_WIDGET_MAP.get( typeVal );
+        String uiType = ( (org.pentaho.di.pojo.annotation.UI) uiAnno ).hint();
+        String widgetType = "TextVar";
+        if ( Const.isEmpty( uiType ) ) {
+          // System.out.println( "Looking for Widget for " + field.getType().getSimpleName() );
+          uiType = JAVA_2_WIDGET_MAP.get( field.getType().getSimpleName() );
+          if ( !Const.isEmpty( uiType ) ) {
+            widgetType = SWT_WIDGET_MAP.get( uiType );
           }
         } else {
-          type = SWT_WIDGET_MAP.get( type );
+          // Save off hint
+          ui.setUIHint( uiType );
+          widgetType = SWT_WIDGET_MAP.get( uiType );
         }
 
         // Map Type to control
         Class<? extends Control> controlClass = null;
         for ( String prefix : SWT_CONTROL_PREFIX ) {
-          String controlClassName = prefix + type;
+          String controlClassName = prefix + widgetType;
 
           try {
             controlClass = (Class<? extends Control>) Class.forName( controlClassName );
             ui.setControl( controlClass );
-            System.out.println( "Found widget: " + controlClass.getName() );
-            ui.setUIStyle( SWT_STYLE_MAP.get( type ) );
+            // System.out.println( "Found widget: " + controlClass.getName() );
+            System.out.println( String.format( "Applying style: %x for type %s", SWT_STYLE_MAP.get( uiType ), uiType ) );
+            ui.setUIStyle( SWT_STYLE_MAP.get( uiType ) );
             break;
           } catch ( Exception e ) {
             // Couldn't find the control, try again with a new prefix
@@ -175,7 +181,7 @@ public class StepPluginUtils {
         }
         if ( controlClass == null ) {
           // TODO
-          System.err.println( "Couldn't find any Control matching " + type );
+          System.err.println( "Couldn't find any Control matching " + widgetType );
         }
       } else {
         // Set defaults
@@ -190,8 +196,8 @@ public class StepPluginUtils {
 
     // Set description to label
     if ( ui != null ) {
-      if ( Const.isEmpty( ui.getText() ) ) {
-        ui.setText( ui.getLabel() );
+      if ( Const.isEmpty( ui.getValue() ) ) {
+        ui.setValue( ui.getLabel() );
       }
       if ( Const.isEmpty( ui.getDescription() ) ) {
         ui.setDescription( ui.getLabel() );
@@ -223,63 +229,77 @@ public class StepPluginUtils {
     // Try the getter method first
     try {
       Method getterMethod = obj.getClass().getMethod( "get" + StringUtils.capitalize( field.getName() ) );
-      return getterMethod.invoke( obj );
+      Object retObj = getterMethod.invoke( obj );
+      System.out.println( "Returning " + retObj + " for call to " + getterMethod.getName() );
+      return retObj;
     } catch ( Exception e ) {
-
+      // No getter method (or its not the right one), keep calm and carry on
     }
 
     // Try to change accessibility just in case
     try {
       field.setAccessible( true );
     } catch ( Exception e ) {
-
+      // Couldn't change the accessibility, keep calm and carry on
     }
 
     // Try direct access to the field
     try {
       return field.get( obj );
-    }
-    catch(Exception e) {
-      throw new NoSuchFieldException();
+    } catch ( Exception e ) {
+      throw new NoSuchFieldException( e.getMessage() );
     }
   }
-  
-  public static void setValueOfFieldToObject( Object obj, Field field, Object value ) throws NoSuchFieldException {
-    // Try the getter method first
-    try {
-      Method setterMethod = obj.getClass().getMethod( "set" + StringUtils.capitalize( field.getName() ) );
-      setterMethod.invoke( obj );
-      return;
-    } catch ( Exception e ) {
 
+  public static void setValueOfFieldToObject( Object obj, Field field, Object value ) throws KettleException {
+    System.out.println( "Attempting to set field " + field.getName() + " to " + value );
+    // Try the setter method first
+    try {
+      Method setterMethod =
+          obj.getClass().getMethod( "set" + StringUtils.capitalize( field.getName() ), value.getClass() );
+      setterMethod.invoke( obj, value );
+      return;
+    } catch ( NoSuchMethodException nsme ) {
+      // No setter method, keep calm and carry on
+    } catch ( Exception e ) {
+      System.err.println( "Couldn't set field " + field.getName() + " to " + value );
+      e.printStackTrace();
     }
 
     // Try to change accessibility just in case
     try {
       field.setAccessible( true );
     } catch ( Exception e ) {
-
+      // Couldn't set accessibility, keep calm and carry on
     }
 
     // Try direct access to the field
     try {
       field.set( obj, value );
-    }
-    catch(Exception e) {
-      throw new NoSuchFieldException();
+    } catch ( Exception e ) {
+      throw new KettleException( "Can't set field " + field.getName() + " to " + value, e );
     }
   }
-  
-  public static HashMap<String, FieldMetadataBean> getFieldMetadataBeansAsMap(Collection<FieldMetadataBean> beans) {
+
+  public static HashMap<String, FieldMetadataBean> getFieldMetadataBeansAsMap( Collection<FieldMetadataBean> beans ) {
     HashMap<String, FieldMetadataBean> fieldMap = null;
-    
-    if(beans != null) {
-      fieldMap = new HashMap<String, FieldMetadataBean>(beans.size());
-      for(FieldMetadataBean bean : beans) {
+
+    if ( beans != null ) {
+      fieldMap = new HashMap<String, FieldMetadataBean>( beans.size() );
+      for ( FieldMetadataBean bean : beans ) {
         fieldMap.put( bean.getName(), bean );
       }
     }
     return fieldMap;
-    
+
+  }
+
+  public static String getValueAsString( FieldMetadataBean fieldBean, Object value ) {
+    // TODO more special formatted types?
+    if ( value instanceof Date ) {
+      SimpleDateFormat sdf = new SimpleDateFormat(ValueMetaBase.DEFAULT_DATE_FORMAT_MASK);
+      return sdf.format((Date) value);
+    }
+    return value.toString();
   }
 }

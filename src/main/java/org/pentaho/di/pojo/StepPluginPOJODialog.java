@@ -3,6 +3,8 @@ package org.pentaho.di.pojo;
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,6 +23,7 @@ import org.eclipse.swt.layout.FormLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
+import org.eclipse.swt.widgets.DateTime;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
@@ -31,6 +34,7 @@ import org.pentaho.di.core.Const;
 import org.pentaho.di.core.annotations.Step;
 import org.pentaho.di.core.exception.KettleException;
 import org.pentaho.di.core.row.ValueMetaInterface;
+import org.pentaho.di.core.row.value.ValueMetaString;
 import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.trans.TransMeta;
 import org.pentaho.di.trans.step.BaseStepMeta;
@@ -44,6 +48,12 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
   protected StepPluginPOJO input;
 
   protected Map<FieldMetadataBean, Control> controlMap = null;
+
+  ModifyListener lsMod = new ModifyListener() {
+    public void modifyText( ModifyEvent e ) {
+      input.setChanged();
+    }
+  };
 
   public StepPluginPOJODialog( Shell parent, Object baseStepMeta, TransMeta transMeta, String stepname ) {
     super( parent, (BaseStepMeta) baseStepMeta, transMeta, stepname );
@@ -60,11 +70,6 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
     props.setLook( shell );
     setShellImage( shell, input );
 
-    ModifyListener lsMod = new ModifyListener() {
-      public void modifyText( ModifyEvent e ) {
-        input.setChanged();
-      }
-    };
     changed = input.hasChanged();
 
     FormLayout formLayout = new FormLayout();
@@ -110,6 +115,11 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
       public void widgetDefaultSelected( SelectionEvent e ) {
         ok();
       }
+
+      @Override
+      public void widgetSelected( SelectionEvent arg0 ) {
+        input.setChanged();
+      }
     };
 
     wStepname.addSelectionListener( lsDef );
@@ -120,7 +130,13 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
       for ( FieldMetadataBean field : fields ) {
         UIMetadataBean ui = field.getUIMetadata();
         Label label = new Label( shell, SWT.RIGHT );
-        label.setText( ui.getLabel() );
+        String labelText = ui.getLabel().trim();
+        if ( !labelText.endsWith( ":" ) ) {
+          labelText += ": ";
+        } else {
+          labelText += " ";
+        }
+        label.setText( labelText );
         props.setLook( label );
         FormData fdlLabel = new FormData();
         fdlLabel.left = new FormAttachment( 0, 0 );
@@ -141,6 +157,7 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
                 controlClass.getDeclaredConstructor( Composite.class, Integer.TYPE ).newInstance( shell,
                     ui.getUIStyle() );
           }
+          System.out.println( "Assigning widget " + control.getClass().getName() + " to field " + field.getName() );
           controlMap.put( field, control );
 
         } catch ( Exception e ) {
@@ -149,29 +166,6 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
         }
 
         props.setLook( control );
-
-        // Set text if possible, and set tooltip text
-        try {
-          Method setText = controlClass.getMethod( "setText", String.class );
-          setText.invoke( control, ui.getText() );
-        } catch ( Exception e ) {
-          // This control has no setText method, keep calm and carry on
-        }
-        control.setToolTipText( ui.getDescription() );
-
-        // TODO add appropriate listeners
-        try {
-          Method addModifyListener = controlClass.getMethod( "addModifyListener", ModifyListener.class );
-          addModifyListener.invoke( control, lsMod );
-        } catch ( Exception e ) {
-          // No-op, the control doesn't listen to modify events
-        }
-        try {
-          Method addSelectionListener = controlClass.getMethod( "addSelectionListener", SelectionListener.class );
-          addSelectionListener.invoke( control, lsDef );
-        } catch ( Exception e ) {
-          // No-op, the control doesn't listen to selection events
-        }
 
         FormData fdLimit = new FormData();
         fdLimit.left = new FormAttachment( middle, 0 );
@@ -238,8 +232,7 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
     // Set the shell size, based upon previous time...
     setSize();
 
-    System.out.println( "Calling getData()" );
-    getData();
+    populateWidgets();
     input.setChanged( changed );
 
     shell.open();
@@ -276,7 +269,7 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
   /**
    * Copy information from the meta-data input to the dialog fields.
    */
-  public void getData() {
+  public void populateWidgets() {
     if ( isDebug() ) {
       logDebug( "getting fields info..." );
     }
@@ -285,10 +278,11 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
     List<FieldMetadataBean> fields = input.getMetaFields();
     if ( fields != null ) {
       for ( FieldMetadataBean fieldBean : fields ) {
+        Field field = fieldBean.getField();
         try {
-          Field field = fieldBean.getField();
           ValueMetaInterface valueMeta = fieldBean.getValueMeta();
-          Object obj = field.get( input );
+          Object obj = StepPluginUtils.getValueOfFieldFromObject( input, field );
+          System.out.println( "StepPluginUtils.getValueOfFieldFromObject(input," + field.getName() + ") = " + obj );
 
           // Set default value if obj is null
           // TODO use ui.getText() for text widgets
@@ -296,138 +290,167 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
             obj = field.getType().newInstance();
           }
 
-          /*
-           * TODO? Use bean methods if available String getterMethodName = "get" + StringUtils.capitalize(
-           * field.getName() ); Method getterMethod = input.getClass().getDeclaredMethod( getterMethodName ); Object obj
-           * = getterMethod.invoke( input );
-           */
-
-          Control control = controlMap.get( field );
+          Control control = controlMap.get( fieldBean );
           // TODO? Replace these hacks to promote shorts and ints with something more robust?
-          if ( Short.class.isAssignableFrom( obj.getClass() ) ) {
-            obj = new Long( ( (Short) obj ).longValue() );
-          }
-          else if ( Integer.class.isAssignableFrom( obj.getClass() ) ) {
+          if ( Integer.class.isAssignableFrom( obj.getClass() ) ) {
             obj = new Long( ( (Integer) obj ).longValue() );
+          } else if ( Short.class.isAssignableFrom( obj.getClass() ) ) {
+            obj = new Long( ( (Short) obj ).longValue() );
+          } else {
+            obj = valueMeta.convertData( valueMeta, obj );
           }
-          obj = valueMeta.convertData( valueMeta, obj );
 
-          System.out.println( "Setting " + field.getName() + " to " + ( obj == null ? "null!" : obj.toString() ) );
+          System.out.println( "Setting widget for " + field.getName() + " to "
+              + ( obj == null ? "null!" : obj.toString() ) );
 
-          // Set text if possible, and set tooltip text
+          // DateTime widgets have different mutators, handle those specially
+          if ( DateTime.class.isAssignableFrom( control.getClass() ) ) {
+            Calendar calendar = Calendar.getInstance();
+            calendar.setTime( valueMeta.getDate( obj ) );
+            if ( fieldBean.getUIMetadata().getUIHint().equalsIgnoreCase( "time" ) ) {
+              DateTime timeWidget = ( (DateTime) control );
+              timeWidget.setHours( calendar.get( Calendar.HOUR ) );
+              timeWidget.setMinutes( calendar.get( Calendar.MINUTE ) );
+              timeWidget.setSeconds( calendar.get( Calendar.SECOND ) );
+
+            } else {
+              // default to date picker
+              DateTime dateWidget = ( (DateTime) control );
+              dateWidget.setYear( calendar.get( Calendar.YEAR ) );
+              dateWidget.setMonth( calendar.get( Calendar.MONTH ) );
+              dateWidget.setDay( calendar.get( Calendar.DAY_OF_MONTH ) );
+
+            }
+          } else {
+            // Set selection if possible
+            try {
+              Method setSelection = control.getClass().getMethod( "setSelection", boolean.class );
+              setSelection.invoke( control, valueMeta.getBoolean( obj ) );
+            } catch ( Exception e ) {
+              // This control has no setSelection method, keep calm and carry on
+
+              // Set text if possible
+              try {
+                Method setText = control.getClass().getMethod( "setText", String.class );
+                setText.invoke( control, Const.NVL( valueMeta.getString( obj ), "" ) );
+              } catch ( Exception e2 ) {
+                // This control has no setText method, keep calm and carry on
+              }
+            }
+          }
+
+          // Set tooltip text
+          control.setToolTipText( fieldBean.getUIMetadata().getDescription() );
+
+          // Add appropriate listeners now that the fields have been populated
           try {
-            Method setText = control.getClass().getMethod( "setText", String.class );
-            setText.invoke( control, Const.NVL( valueMeta.getString( obj ), "" ) );
+            Method addModifyListener = control.getClass().getMethod( "addModifyListener", ModifyListener.class );
+            addModifyListener.invoke( control, lsMod );
           } catch ( Exception e ) {
-            // This control has no setText method, keep calm and carry on
+            // No-op, the control doesn't listen to modify events
+          }
+          try {
+            Method addSelectionListener =
+                control.getClass().getMethod( "addSelectionListener", SelectionListener.class );
+            addSelectionListener.invoke( control, lsDef );
+          } catch ( Exception e ) {
+            // No-op, the control doesn't listen to selection events
           }
 
-          // Set selection if possible
-          try {
-            Method setSelection = control.getClass().getMethod( "setSelection", boolean.class );
-            setSelection.invoke( control, valueMeta.getBoolean( obj ) );
-          } catch ( Exception e ) {
-            // This control has no setText method, keep calm and carry on
-          }
         } catch ( Exception e ) {
-          // TODO throw, skip?
-          e.printStackTrace( System.err );
+          logError( "Couldn't get value for field: " + ( field == null ? "null" : field.getName() ), e );
         }
+
       }
     } else {
       System.out.println( "No fields!!" );
     }
-
-    /*
-     * wLimit.setText( input.getRowLimit() ); wNeverEnding.setSelection( input.isNeverEnding() ); wInterval.setText(
-     * Const.NVL( input.getIntervalInMs(), "" ) ); wRowTimeField.setText( Const.NVL( input.getRowTimeField(), "" ) );
-     * wLastTimeField.setText( Const.NVL( input.getLastTimeField(), "" ) );
-     * 
-     * for ( int i = 0; i < input.getFieldName().length; i++ ) { if ( input.getFieldName()[i] != null ) { TableItem item
-     * = wFields.table.getItem( i ); int col = 1; item.setText( col++, input.getFieldName()[i] );
-     * 
-     * String type = input.getFieldType()[i]; String format = input.getFieldFormat()[i]; String length =
-     * input.getFieldLength()[i] < 0 ? "" : ( "" + input.getFieldLength()[i] ); String prec =
-     * input.getFieldPrecision()[i] < 0 ? "" : ( "" + input.getFieldPrecision()[i] );
-     * 
-     * String curr = input.getCurrency()[i]; String group = input.getGroup()[i]; String decim = input.getDecimal()[i];
-     * String def = input.getValue()[i];
-     * 
-     * item.setText( col++, Const.NVL( type, "" ) ); item.setText( col++, Const.NVL( format, "" ) ); item.setText(
-     * col++, Const.NVL( length, "" ) ); item.setText( col++, Const.NVL( prec, "" ) ); item.setText( col++, Const.NVL(
-     * curr, "" ) ); item.setText( col++, Const.NVL( decim, "" ) ); item.setText( col++, Const.NVL( group, "" ) );
-     * item.setText( col++, Const.NVL( def, "" ) ); item.setText( col++, input.isSetEmptyString()[i] ?
-     * BaseMessages.getString( PKG, "System.Combo.Yes" ) : BaseMessages.getString( PKG, "System.Combo.No" ) );
-     * 
-     * } }
-     * 
-     * wFields.setRowNums(); wFields.optWidth( true );
-     */
 
     wStepname.selectAll();
     wStepname.setFocus();
   }
 
   private void getInfo( StepPluginPOJO meta ) throws KettleException {
+    System.out.println( "In getInfo()" );
 
     // Call the bean methods to get the info
     List<FieldMetadataBean> fields = input.getMetaFields();
     if ( fields != null ) {
       for ( FieldMetadataBean fieldBean : fields ) {
+        Field field = fieldBean.getField();
         try {
-          Field field = fieldBean.getField();
           ValueMetaInterface valueMeta = fieldBean.getValueMeta();
-          Object obj = null;
-          /* TODO? Use bean methods if available */
+          String objString = null;
 
-          Control control = controlMap.get( field );
-
-          // Set text if possible, and set tooltip text
-          try {
-            Method setText = control.getClass().getMethod( "getText" );
-            obj = setText.invoke( control, Const.NVL( valueMeta.getString( obj ), "" ) );
-          } catch ( Exception e ) {
-            // This control has no setText method, keep calm and carry on
+          Control control = controlMap.get( fieldBean );
+          if ( control == null ) {
+            System.err.println( "No widget for " + field.getName() );
           }
 
-          // Set selection if possible
+          // Get selection if possible
           try {
-            Method setSelection = control.getClass().getMethod( "getSelection" );
-            obj = setSelection.invoke( control, valueMeta.getBoolean( obj ) );
+            Method getSelection = control.getClass().getMethod( "getSelection" );
+            objString = Boolean.toString( (Boolean) getSelection.invoke( control ) );
+            System.out.println( field.getName() + ".getSelection() = " + objString );
           } catch ( Exception e ) {
-            // This control has no setText method, keep calm and carry on
+            // This control has no getSelection method, keep calm and carry on
           }
 
-          obj = valueMeta.convertData( valueMeta, obj );
+          if ( objString == null ) {
+            // Get text if possible, and set tooltip text
+            try {
+              Method getText = control.getClass().getMethod( "getText" );
+              objString = (String) getText.invoke( control );
+              System.out.println( "(" + field.getName() + ") " + control.getClass().getSimpleName() + ".getText() = "
+                  + objString );
+            } catch ( Exception e ) {
+              // This control has no getText method, keep calm and carry on
+            }
+          }
+
+          if ( DateTime.class.isAssignableFrom( control.getClass() ) ) {
+            // Get date/time
+            try {
+              String uiHint = fieldBean.getUIMetadata().getUIHint();
+              if ( uiHint.equalsIgnoreCase( "time" ) ) {
+                Method getHour = control.getClass().getMethod( "getHours" );
+                Method getMinute = control.getClass().getMethod( "getMinutes" );
+                Method getSecond = control.getClass().getMethod( "getSeconds" );
+                objString =
+                    String.format( "%02d:%02d:%02d", getHour.invoke( control ), getMinute.invoke( control ), getSecond
+                        .invoke( control ) );
+                System.out.println( field.getName() + ".getTime() = " + objString );
+              } else {
+                Method getYear = control.getClass().getMethod( "getYear" );
+                Method getMonth = control.getClass().getMethod( "getMonth" );
+                Method getDay = control.getClass().getMethod( "getDay" );
+                objString =
+                    String.format( "%02d/%02d/%02d 00:00:00.000", getYear.invoke( control ), ( (Integer) getMonth
+                        .invoke( control ) ) + 1, getDay.invoke( control ) );
+                System.out.println( field.getName() + ".getDate() = " + objString );
+              }
+            } catch ( Exception e ) {
+              // This control has no getter method, keep calm and carry on
+              e.printStackTrace( System.err );
+            }
+          }
+
+          Object obj = valueMeta.convertData( new ValueMetaString(), objString );
+          System.out.println( "After convert, obj class = " + obj.getClass().getSimpleName() );
+
+          // TODO API methods, better hack?
+          if ( Long.class.isAssignableFrom( obj.getClass() ) && Integer.TYPE.isAssignableFrom( field.getType() ) ) {
+            obj = ( (Long) obj ).intValue();
+          }
+          System.out.println( "Field type = " + field.getType().getSimpleName() + ", value type = "
+              + obj.getClass().getSimpleName() );
+
+          System.out.println( "Setting value of " + field.getName() + " to " + obj );
+          StepPluginUtils.setValueOfFieldToObject( input, field, obj );
         } catch ( Exception e ) {
-          // TODO throw, skip?
+          logError( "Couldn't save field: " + ( field == null ? "null" : field.getName() ), e );
         }
       }
     }
-
-    /*
-     * meta.setRowLimit( wLimit.getText() ); meta.setNeverEnding( wNeverEnding.getSelection() ); meta.setIntervalInMs(
-     * wInterval.getText() ); meta.setRowTimeField( wRowTimeField.getText() ); meta.setLastTimeField(
-     * wLastTimeField.getText() );
-     * 
-     * int nrfields = wFields.nrNonEmpty();
-     * 
-     * meta.allocate( nrfields );
-     * 
-     * // CHECKSTYLE:Indentation:OFF for ( int i = 0; i < nrfields; i++ ) { TableItem item = wFields.getNonEmpty( i );
-     * 
-     * meta.getFieldName()[i] = item.getText( 1 );
-     * 
-     * meta.getFieldFormat()[i] = item.getText( 3 ); String slength = item.getText( 4 ); String sprec = item.getText( 5
-     * ); meta.getCurrency()[i] = item.getText( 6 ); meta.getDecimal()[i] = item.getText( 7 ); meta.getGroup()[i] =
-     * item.getText( 8 ); meta.isSetEmptyString()[i] = BaseMessages.getString( PKG, "System.Combo.Yes"
-     * ).equalsIgnoreCase( item.getText( 10 ) );
-     * 
-     * meta.getValue()[i] = meta.isSetEmptyString()[i] ? "" : item.getText( 9 ); meta.getFieldType()[i] =
-     * meta.isSetEmptyString()[i] ? "String" : item.getText( 2 ); meta.getFieldLength()[i] = Const.toInt( slength, -1 );
-     * meta.getFieldPrecision()[i] = Const.toInt( sprec, -1 ); }
-     * 
-     * // Performs checks...
-     */
   }
 }

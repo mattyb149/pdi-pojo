@@ -7,6 +7,6 @@ import java.lang.annotation.RetentionPolicy;
 public @interface UI {
   String label() default "";
   String hint() default "";
-  String text() default "";
+  String value() default "";
   String description() default "";
 }
