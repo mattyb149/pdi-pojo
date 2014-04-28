@@ -23,6 +23,7 @@ import org.pentaho.di.core.row.value.ValueMetaString;
 import org.pentaho.di.core.variables.VariableSpace;
 import org.pentaho.di.core.xml.XMLHandler;
 import org.pentaho.di.pojo.annotation.ExcludeMeta;
+import org.pentaho.di.pojo.annotation.NewField;
 import org.pentaho.di.repository.ObjectId;
 import org.pentaho.di.repository.Repository;
 import org.pentaho.di.trans.Trans;
@@ -47,6 +48,14 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
   protected MoreAccessibleBaseStep baseStep = null;
   protected StepDataInterface stepDataInterface = null;
   protected List<FieldMetadataBean> metaFields = null;
+  protected List<FieldMetadataBean> newFields = null;
+  
+  // Helper fields
+  protected RowMetaInterface outputRowMeta = null;
+  
+  // From BaseStep
+  /** if true then the row being processed is the first row */
+  public boolean first = true;
 
   public StepPluginPOJO() {
     generateMetaFields();
@@ -84,13 +93,19 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
     Field[] fields = this.getClass().getDeclaredFields();
     if ( fields != null ) {
       metaFields = new ArrayList<FieldMetadataBean>( fields.length );
+      newFields = new ArrayList<FieldMetadataBean>();
 
       for ( Field field : fields ) {
         if ( field.getAnnotation( ExcludeMeta.class ) == null ) {
           FieldMetadataBean fieldMetadata = StepPluginUtils.generateFieldMetadata( field );
           if ( fieldMetadata != null ) {
             metaFields.add( fieldMetadata );
-            // System.out.println( "Added meta field: " + field.getName() );
+            
+            // Add to new fields list if new
+            if ( field.getAnnotation( NewField.class ) != null ) {
+              newFields.add( fieldMetadata );
+              // System.out.println( "Added new field: " + field.getName() );
+            }
           }
         } else {
           System.out.println( "Excluded field: " + field.getName() );
@@ -457,10 +472,19 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
     return StepPluginPOJODialog.class.getName();
   }
 
-  public void getFields( RowMetaInterface inputRowMeta, String name, RowMetaInterface[] info, StepMeta nextStep,
+  public void getFields( RowMetaInterface rowMeta, String name, RowMetaInterface[] info, StepMeta nextStep,
       VariableSpace space, Repository repo, IMetaStore metaStore ) throws KettleStepException {
-    // TODO
-    super.getFields( inputRowMeta, name, info, nextStep, space, repo, metaStore );
+
+    // Add new fields
+    List<FieldMetadataBean> newFields = getNewFields();
+    if ( newFields != null ) {
+      for ( FieldMetadataBean fieldBean : newFields ) {
+        ValueMetaInterface v = fieldBean.getValueMeta();
+        v.setOrigin( name );
+        v.setName( fieldBean.getName() );
+        rowMeta.addValueMeta( v );
+      }
+    }
   }
 
   // TODO
@@ -527,7 +551,7 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
                 }
               }
               // TODO Dates/times?
-              
+
               StepPluginUtils.setValueOfFieldToObject( this, field, convertedValue );
             } else {
               System.out.println( "No value in XML for " + field.getName() + ", using default" );
@@ -788,5 +812,9 @@ public abstract class StepPluginPOJO extends BaseStepMeta implements StepMetaInt
   @Override
   public void setDefault() {
     // TODO Auto-generated method stub
+  }
+
+  public List<FieldMetadataBean> getNewFields() {
+    return newFields;
   }
 }
