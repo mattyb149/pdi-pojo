@@ -64,7 +64,7 @@ public class TestStepPluginPOJO extends StepPluginPOJO {
     if ( newFieldIndex == -1 ) {
       throw new KettleException( "Couldn't find field 'status' in output row!" );
     }
-    newRow[newFieldIndex] = "World";
+    newRow[newFieldIndex] = status;
 
     putRow( outputRowMeta, newRow ); // copy row to possible alternate rowset(s).
 

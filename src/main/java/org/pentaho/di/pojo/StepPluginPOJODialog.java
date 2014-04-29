@@ -189,7 +189,7 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
       public void handleEvent( Event event ) {
         // Check for overridden ok method
         try {
-          Method okMethod = input.getClass().getMethod( "ok" );
+          Method okMethod = input.getClass().getDeclaredMethod( "ok" );
           okMethod.invoke( input );
         } catch ( Exception e ) {
           ok();
@@ -201,7 +201,7 @@ public class StepPluginPOJODialog extends BaseStepDialog implements StepDialogIn
       public void handleEvent( Event event ) {
         // Check for overridden cancel method
         try {
-          Method cancelMethod = input.getClass().getMethod( "cancel" );
+          Method cancelMethod = input.getClass().getDeclaredMethod( "cancel" );
           cancelMethod.invoke( input );
         } catch ( Exception e ) {
           cancel();

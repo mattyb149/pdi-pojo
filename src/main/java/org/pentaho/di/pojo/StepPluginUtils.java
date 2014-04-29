@@ -228,7 +228,7 @@ public class StepPluginUtils {
   public static Object getValueOfFieldFromObject( Object obj, Field field ) throws NoSuchFieldException {
     // Try the getter method first
     try {
-      Method getterMethod = obj.getClass().getMethod( "get" + StringUtils.capitalize( field.getName() ) );
+      Method getterMethod = obj.getClass().getDeclaredMethod( "get" + StringUtils.capitalize( field.getName() ) );
       Object retObj = getterMethod.invoke( obj );
       System.out.println( "Returning " + retObj + " for call to " + getterMethod.getName() );
       return retObj;
@@ -256,7 +256,7 @@ public class StepPluginUtils {
     // Try the setter method first
     try {
       Method setterMethod =
-          obj.getClass().getMethod( "set" + StringUtils.capitalize( field.getName() ), value.getClass() );
+          obj.getClass().getDeclaredMethod( "set" + StringUtils.capitalize( field.getName() ), value.getClass() );
       setterMethod.invoke( obj, value );
       return;
     } catch ( NoSuchMethodException nsme ) {
