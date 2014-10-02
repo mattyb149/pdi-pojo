@@ -4,11 +4,24 @@ apply plugin: 'idea'
 apply plugin: 'maven'
 apply plugin: 'signing'
 
-project.ext.kettle_version = '5.0.5+'
+project.ext.kettle_version = '5.1.2.0-101'
 description = "Helpers to create PDI elements using POJOs"
+version = '1.0.1'
+group = 'mattyb149'
+status = 'RELEASE'
+project.ext.apiKey = System.getenv('BINTRAY_API_KEY') ?: System.getProperty('BINTRAY_API_KEY')
 
-// Spock works with Java 1.6 and above
 sourceCompatibility = 1.6
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.jfrog.bintray.gradle:gradle-bintray-plugin:0.6'
+    }
+}
+apply plugin: 'com.jfrog.bintray'
 
 repositories {
   
@@ -30,25 +43,27 @@ repositories {
 }
 
 configurations {
-  runtimeWithoutCompile {
-    transitive = false
+  provided
+  compile {
+     extendsFrom provided
   }
+  
   zip
 }
 
+
 dependencies {
-  compile("pentaho-kettle:kettle-core:${project.ext.kettle_version}")
-  compile("pentaho-kettle:kettle-engine:${project.ext.kettle_version}")
-  compile("pentaho-kettle:kettle-dbdialog:${project.ext.kettle_version}") 
-  compile("pentaho-kettle:kettle-ui-swt:${project.ext.kettle_version}") {
+  provided("pentaho-kettle:kettle-core:${project.ext.kettle_version}")
+  provided("pentaho-kettle:kettle-engine:${project.ext.kettle_version}")
+  provided("pentaho-kettle:kettle-dbdialog:${project.ext.kettle_version}") 
+  provided("pentaho-kettle:kettle-ui-swt:${project.ext.kettle_version}") {
     exclude module:'jface'
   }
-  compile("pentaho:metastore:${project.ext.kettle_version}")
 }
 
 // This task builds a PDI plugin in the correct format, a ZIP with the plugin JAR at the root and a lib/ folder containing
 // all third-party dependencies
-task plugin(dependsOn: [jar,compileTestJava], type: Zip) {
+task plugin(dependsOn:jar, type: Zip) {
   into("${project.name}/") {
     from jar.outputs.files
     from fileTree(dir: 'package-res')
@@ -56,18 +71,51 @@ task plugin(dependsOn: [jar,compileTestJava], type: Zip) {
   
   // The list of JARs in the lib/ folder is the complement of the intersection of the compile and runtime dependencies,
   // plus the JARs in the runtimeWithoutCompile config
+  // The list of JARs in the lib/ folder is the complement of the intersection of the compile and runtime dependencies,
+  // plus the JARs in the runtimeWithoutCompile config
   def compileDeps = configurations.compile.resolve()
-  def runtimeDeps = configurations.runtime.resolve()
-  def leftovers = (compileDeps + runtimeDeps) - compileDeps.intersect(runtimeDeps)
-  into("${project.name}/lib") {
+  def providedDeps = configurations.provided.resolve()
+  def leftovers = compileDeps - providedDeps
+    into("${project.name}/lib") {
     from leftovers
-    from configurations.runtimeWithoutCompile
   }
 }
 
 artifacts {
   zip plugin
 }
+
+bintray {
+        //apiUrl = "https://api.bintray.net"
+        user = System.getProperty('BINTRAY_USER') ?: 'mattyb149'
+        key = project.ext.apiKey
+        configurations = ['zip']
+        //publications = ['published']
+        filesSpec {
+          from 'files'
+          into 'standalone_files/level1'
+          rename '(.+)\\.(.+)', '$1-suffix.$2'
+        }
+        //publish = project.publish
+        dryRun = false
+        pkg {
+            repo = 'maven'
+            userOrg = group
+            name = project.name
+            desc = 'Facilitates the development of plugins for Pentaho Data Integration'
+            websiteUrl = 'https://github.com/mattyb149/pdi-pojo'
+            issueTrackerUrl = 'https://github.com/mattyb149/pdi-pojo/issues'
+            vcsUrl = 'https://github.com/mattyb149/pdi-pojo.git'
+            licenses = ['Apache-2.0']
+            labels = ['pdi', 'kettle', 'pentaho']
+            attributes= ['plat': ['linux', 'osx']]
+            publicDownloadNumbers = true
+            version {
+                vcsTag = version
+            }
+        }
+    }
+
 
 task wrapper(type: Wrapper) {
   gradleVersion = "1.8"
